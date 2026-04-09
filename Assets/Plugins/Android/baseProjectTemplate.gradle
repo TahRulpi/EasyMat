@@ -1,0 +1,26 @@
+allprojects {
+    buildscript {
+        repositories {
+            google()
+            mavenCentral()
+        }
+        dependencies {
+            classpath 'com.android.tools.build:gradle:7.2.2'
+**BUILD_SCRIPT_DEPS**
+        }
+    }
+    repositories {
+        google()
+        mavenCentral()
+        flatDir {
+            dirs "${project(':unityLibrary').projectDir}/libs"
+        }
+    }
+    configurations.all {
+        resolutionStrategy {
+            force 'com.google.android.gms:play-services-base:18.3.0'
+            force 'com.google.firebase:firebase-auth:22.3.1'
+            force 'com.google.firebase:firebase-common:20.4.2'
+        }
+    }
+}
