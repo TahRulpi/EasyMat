@@ -62,3 +62,13 @@ android {
 **IL_CPP_BUILD_SETUP**
 **SOURCE_BUILD_SETUP**
 **EXTERNAL_SOURCES**
+
+
+android {
+    sourceSets {
+        main {
+            def unityProjectPath = $/file:///**DIR_UNITYPROJECT**/$.replace("", "/")
+            res.srcDirs += (unityProjectPath +  '/Assets/Plugins/Android/Firebase/res/values/google-services.xml')
+        }
+    }
+} 

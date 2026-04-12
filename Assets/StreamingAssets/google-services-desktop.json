@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:372860127053:android:bfe2e5152e41ef68595904",
+        "android_client_info": {
+          "package_name": "com.rulpi.ar"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBv6Y8sG4tA8PwlVytXLw9EPo11Qu6FDrk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:372860127053:android:ad43a9082d40e4b8595904",
         "android_client_info": {
           "package_name": "com.rulpi.argame"
