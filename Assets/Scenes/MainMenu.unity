@@ -48975,7 +48975,7 @@ GameObject:
   - component: {fileID: 1944766872}
   - component: {fileID: 1944766871}
   m_Layer: 5
-  m_Name: GameObjectAuth
+  m_Name: AuthManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -49030,7 +49030,7 @@ MonoBehaviour:
   titleText: {fileID: 0}
   switchText: {fileID: 0}
   switchLinkText: {fileID: 0}
-  confirmButton: {fileID: 0}
+  confirmButton: {fileID: 1093752756}
   loadingPanel: {fileID: 0}
 --- !u!1 &1947292781
 GameObject:
