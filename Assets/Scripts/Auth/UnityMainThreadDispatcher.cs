@@ -1,7 +1,6 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using System;
+using System.Collections.Generic;
 
 public class UnityMainThreadDispatcher : MonoBehaviour
 {
@@ -12,7 +11,6 @@ public class UnityMainThreadDispatcher : MonoBehaviour
     {
         if (_instance == null)
         {
-            // Auto-create if not in scene
             var go = new GameObject("UnityMainThreadDispatcher");
             _instance = go.AddComponent<UnityMainThreadDispatcher>();
             DontDestroyOnLoad(go);
@@ -26,6 +24,11 @@ public class UnityMainThreadDispatcher : MonoBehaviour
         {
             _instance = this;
             DontDestroyOnLoad(gameObject);
+        }
+        else
+        {
+            // ✅ Destroy duplicate — this was missing before
+            Destroy(gameObject);
         }
     }
 

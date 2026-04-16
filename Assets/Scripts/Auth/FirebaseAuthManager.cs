@@ -4,6 +4,7 @@ using Firebase;
 using Firebase.Auth;
 using TMPro;
 using UnityEngine.UI;
+using System.Text.RegularExpressions;
 
 public class FirebaseAuthManager : MonoBehaviour
 {
@@ -22,11 +23,12 @@ public class FirebaseAuthManager : MonoBehaviour
     public Button confirmButton;
     public GameObject loadingPanel;
 
+    // ── UNITY START ────────────────────────────────────────────────
     void Start()
     {
-
         Debug.Log("=== SCRIPT IS RUNNING ===");
-        // ✅ BLOCK confirm button until Firebase is ready
+
+        // Block confirm button until Firebase is ready
         SetConfirmButtonInteractable(false);
         SetStatus("Initializing Firebase...");
         Debug.Log("=== Firebase Init Starting ===");
@@ -41,8 +43,7 @@ public class FirebaseAuthManager : MonoBehaviour
                     firebaseReady = true;
                     Debug.Log("✅ Firebase Ready!");
 
-                    // ✅ CRITICAL: Only go to game if ALREADY logged in from before
-                    // If no user, stay on login screen — DO NOT go to game
+                    // Only go to game if a session is already persisted
                     if (auth.CurrentUser != null)
                     {
                         Debug.Log("Already logged in: " + auth.CurrentUser.Email);
@@ -50,7 +51,6 @@ public class FirebaseAuthManager : MonoBehaviour
                     }
                     else
                     {
-                        // Stay on login screen, enable confirm button now
                         SetConfirmButtonInteractable(true);
                         SetLoginMode();
                         SetStatus("Please login or register.");
@@ -68,54 +68,72 @@ public class FirebaseAuthManager : MonoBehaviour
     // ── CONFIRM BUTTON ─────────────────────────────────────────────
     public void OnConfirmButton()
     {
-        // ✅ BLOCK if already processing
+        // Block if already processing
         if (isProcessing)
         {
-            SetStatus("Please wait...");
+            SetStatus("⏳ Please wait...");
             return;
         }
 
-        // ✅ BLOCK if Firebase not ready
+        // Block if Firebase not ready
         if (!firebaseReady)
         {
-            SetStatus("Firebase not ready. Please wait.");
+            SetStatus("⏳ Firebase not ready. Please wait.");
             return;
         }
 
-        // ✅ BLOCK if email is empty
-        if (string.IsNullOrEmpty(emailInput.text.Trim()))
+        string email = emailInput.text.Trim();
+        string password = passwordInput.text;
+
+        // ── CLIENT-SIDE VALIDATION (runs before ANY Firebase call) ──
+
+        // 1. Email empty check
+        if (string.IsNullOrEmpty(email))
         {
             SetStatus("❌ Please enter your email.");
             return;
         }
 
-        // ✅ BLOCK if password is empty
-        if (string.IsNullOrEmpty(passwordInput.text))
+        // 2. Email format check (valid structure like user@domain.com)
+        if (!IsValidEmail(email))
+        {
+            SetStatus("❌ Please enter a valid email address.");
+            return;
+        }
+
+        // 3. Password empty check
+        if (string.IsNullOrEmpty(password))
         {
             SetStatus("❌ Please enter your password.");
             return;
         }
 
-        // ✅ BLOCK if password too short
-        if (passwordInput.text.Length < 6)
+        // 4. Password minimum length check
+        if (password.Length < 6)
         {
             SetStatus("❌ Password must be at least 6 characters.");
             return;
         }
 
-        // ✅ Now decide login or register
+        // All checks passed — proceed
         if (isLoginMode)
-            Login();
+            Login(email, password);
         else
-            Register();
+            Register(email, password);
+    }
+
+    // ── EMAIL VALIDATION HELPER ────────────────────────────────────
+    // Checks for a proper email format: something@something.something
+    bool IsValidEmail(string email)
+    {
+        // Standard email regex — rejects "abc", "abc@", "@abc.com", "abc@abc", etc.
+        string pattern = @"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$";
+        return Regex.IsMatch(email, pattern, RegexOptions.IgnoreCase);
     }
 
     // ── REGISTER ───────────────────────────────────────────────────
-    void Register()
+    void Register(string email, string password)
     {
-        string email = emailInput.text.Trim();
-        string password = passwordInput.text;
-
         isProcessing = true;
         SetConfirmButtonInteractable(false);
         ShowLoading(true);
@@ -143,24 +161,20 @@ public class FirebaseAuthManager : MonoBehaviour
                         string error = GetFirebaseError(task.Exception);
                         SetStatus("❌ " + error);
                         Debug.LogError("Register failed: " + error);
-                        // ✅ STAY ON SCREEN — do NOT load game
-                        return;
+                        return; // Stay on screen
                     }
 
-                    // ✅ ONLY load game after confirmed success
+                    // Success — load game
                     Debug.Log("✅ Account created: " + task.Result.User.Email);
                     SetStatus("✅ Account created! Loading game...");
-                    LoadGameScene(); // ← ONLY called here on success
+                    LoadGameScene();
                 });
             });
     }
 
     // ── LOGIN ──────────────────────────────────────────────────────
-    void Login()
+    void Login(string email, string password)
     {
-        string email = emailInput.text.Trim();
-        string password = passwordInput.text;
-
         isProcessing = true;
         SetConfirmButtonInteractable(false);
         ShowLoading(true);
@@ -188,14 +202,13 @@ public class FirebaseAuthManager : MonoBehaviour
                         string error = GetFirebaseError(task.Exception);
                         SetStatus("❌ " + error);
                         Debug.LogError("Login failed: " + error);
-                        // ✅ STAY ON SCREEN — do NOT load game
-                        return;
+                        return; // Stay on screen
                     }
 
-                    // ✅ ONLY load game after confirmed success
+                    // Success — load game
                     Debug.Log("✅ Logged in: " + task.Result.User.Email);
                     SetStatus("✅ Welcome! Loading game...");
-                    LoadGameScene(); // ← ONLY called here on success
+                    LoadGameScene();
                 });
             });
     }
@@ -203,12 +216,20 @@ public class FirebaseAuthManager : MonoBehaviour
     // ── SWITCH LOGIN / REGISTER MODE ───────────────────────────────
     public void OnSwitchModeButton()
     {
+        // Don't allow switching while a request is in-flight
+        if (isProcessing)
+        {
+            SetStatus("⏳ Please wait before switching modes.");
+            return;
+        }
+
+        // Toggle mode
         if (isLoginMode)
             SetRegisterMode();
         else
             SetLoginMode();
 
-        // Clear fields when switching
+        // Always clear fields and status when switching
         emailInput.text = "";
         passwordInput.text = "";
         SetStatus("");
@@ -218,7 +239,7 @@ public class FirebaseAuthManager : MonoBehaviour
     {
         isLoginMode = true;
         if (titleText) titleText.text = "Log in to your account";
-        if (switchText) switchText.text = "Don't have any account?";
+        if (switchText) switchText.text = "Don't have an account?";
         if (switchLinkText) switchLinkText.text = "Register";
         Debug.Log("Mode: LOGIN");
     }
@@ -243,7 +264,7 @@ public class FirebaseAuthManager : MonoBehaviour
     // ── LOAD GAME ──────────────────────────────────────────────────
     void LoadGameScene()
     {
-        // ✅ FINAL SAFETY CHECK before loading
+        // Final safety check before loading
         if (auth.CurrentUser == null)
         {
             SetStatus("❌ Not authenticated. Please login.");
@@ -289,16 +310,17 @@ public class FirebaseAuthManager : MonoBehaviour
             var errorCode = (AuthError)firebaseEx.ErrorCode;
             return errorCode switch
             {
-                AuthError.EmailAlreadyInUse => "Email already in use.",
+                AuthError.EmailAlreadyInUse => "Email already in use. Try logging in instead.",
                 AuthError.InvalidEmail => "Invalid email address.",
                 AuthError.WeakPassword => "Password is too weak.",
                 AuthError.WrongPassword => "Incorrect password.",
-                AuthError.UserNotFound => "No account with this email.",
-                AuthError.NetworkRequestFailed => "Network error. Check connection.",
-                AuthError.TooManyRequests => "Too many attempts. Try later.",
+                AuthError.UserNotFound => "No account found. Please register first.",
+                AuthError.NetworkRequestFailed => "Network error. Check your connection.",
+                AuthError.TooManyRequests => "Too many attempts. Please try later.",
                 _ => firebaseEx.Message
             };
         }
+
         return exception.Message;
     }
 }
