@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using Firebase;
 using Firebase.Auth;
 using TMPro;
@@ -12,6 +11,11 @@ public class FirebaseAuthManager : MonoBehaviour
     private bool firebaseReady = false;
     private bool isLoginMode = true;
     private bool isProcessing = false;
+   // private bool hasRegistered = false;
+
+    [Header("Panels")]
+    public GameObject loginPanel;       // drag your LoginPanel here
+    public GameObject homepagePanel;    // drag your Homepage panel here
 
     [Header("UI References")]
     public TMP_InputField emailInput;
@@ -23,10 +27,18 @@ public class FirebaseAuthManager : MonoBehaviour
     public Button confirmButton;
     public GameObject loadingPanel;
 
+
+    public TMP_InputField usernameInput;
+    public TMP_InputField confirmPasswordInput;
+
+
     // ── UNITY START ────────────────────────────────────────────────
     void Start()
     {
         Debug.Log("=== SCRIPT IS RUNNING ===");
+
+        // Make sure homepage is hidden at start
+        ShowHomepage(false);
 
         // Block confirm button until Firebase is ready
         SetConfirmButtonInteractable(false);
@@ -41,24 +53,24 @@ public class FirebaseAuthManager : MonoBehaviour
                 {
                     auth = FirebaseAuth.DefaultInstance;
                     firebaseReady = true;
-                    Debug.Log("✅ Firebase Ready!");
+                    Debug.Log("Firebase Ready!");
 
-                    // Only go to game if a session is already persisted
-                    if (auth.CurrentUser != null)
+                    // If already logged in from a previous session -> go straight to homepage
+                   /* if (auth.CurrentUser != null)
                     {
                         Debug.Log("Already logged in: " + auth.CurrentUser.Email);
-                        LoadGameScene();
-                    }
-                    else
-                    {
+                        ShowHomepage(true);
+                    }*/
+                   // else
+                    
                         SetConfirmButtonInteractable(true);
                         SetLoginMode();
                         SetStatus("Please login or register.");
-                    }
+                    
                 }
                 else
                 {
-                    SetStatus("❌ Firebase failed to load.");
+                    SetStatus("Firebase failed to load.");
                     Debug.LogError("Firebase FAILED: " + task.Result);
                 }
             });
@@ -68,65 +80,83 @@ public class FirebaseAuthManager : MonoBehaviour
     // ── CONFIRM BUTTON ─────────────────────────────────────────────
     public void OnConfirmButton()
     {
-        // Block if already processing
         if (isProcessing)
         {
-            SetStatus("⏳ Please wait...");
+            SetStatus("Please wait...");
             return;
         }
 
-        // Block if Firebase not ready
         if (!firebaseReady)
         {
-            SetStatus("⏳ Firebase not ready. Please wait.");
+            SetStatus("Firebase not ready. Please wait.");
             return;
         }
 
         string email = emailInput.text.Trim();
         string password = passwordInput.text;
+        string username = usernameInput != null ? usernameInput.text.Trim() : "";
+        string confirmPassword = confirmPasswordInput != null ? confirmPasswordInput.text : "";
 
-        // ── CLIENT-SIDE VALIDATION (runs before ANY Firebase call) ──
-
-        // 1. Email empty check
+        // ── EMAIL VALIDATION ─────────────────────
         if (string.IsNullOrEmpty(email))
         {
-            SetStatus("❌ Please enter your email.");
+            SetStatus("Please enter your email.");
             return;
         }
 
-        // 2. Email format check (valid structure like user@domain.com)
         if (!IsValidEmail(email))
         {
-            SetStatus("❌ Please enter a valid email address.");
+            SetStatus("Please enter a valid email address.");
             return;
         }
 
-        // 3. Password empty check
+        // ── PASSWORD VALIDATION ──────────────────
         if (string.IsNullOrEmpty(password))
         {
-            SetStatus("❌ Please enter your password.");
+            SetStatus("Please enter your password.");
             return;
         }
 
-        // 4. Password minimum length check
         if (password.Length < 6)
         {
-            SetStatus("❌ Password must be at least 6 characters.");
+            SetStatus("Password must be at least 6 characters.");
             return;
         }
 
-        // All checks passed — proceed
-        if (isLoginMode)
-            Login(email, password);
-        else
+        // ── REGISTER MODE VALIDATION ─────────────
+        if (!isLoginMode)
+        {
+            if (string.IsNullOrEmpty(username))
+            {
+                SetStatus("Please enter a username.");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(confirmPassword))
+            {
+                SetStatus("Please confirm your password.");
+                return;
+            }
+
+            if (password != confirmPassword)
+            {
+                SetStatus("Passwords do not match.");
+                return;
+            }
+
+            // ✅ REGISTER
             Register(email, password);
+        }
+        else
+        {
+            // ✅ LOGIN
+            Login(email, password);
+        }
     }
 
-    // ── EMAIL VALIDATION HELPER ────────────────────────────────────
-    // Checks for a proper email format: something@something.something
+    // ── EMAIL VALIDATION ───────────────────────────────────────────
     bool IsValidEmail(string email)
     {
-        // Standard email regex — rejects "abc", "abc@", "@abc.com", "abc@abc", etc.
         string pattern = @"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$";
         return Regex.IsMatch(email, pattern, RegexOptions.IgnoreCase);
     }
@@ -140,6 +170,8 @@ public class FirebaseAuthManager : MonoBehaviour
         SetStatus("Creating account...");
         Debug.Log("Attempting Register: " + email);
 
+        string username = usernameInput != null ? usernameInput.text.Trim() : "";
+
         auth.CreateUserWithEmailAndPasswordAsync(email, password)
             .ContinueWith(task =>
             {
@@ -149,25 +181,59 @@ public class FirebaseAuthManager : MonoBehaviour
                     ShowLoading(false);
                     SetConfirmButtonInteractable(true);
 
+                    // ❌ Cancelled
                     if (task.IsCanceled)
                     {
-                        SetStatus("❌ Registration cancelled.");
-                        Debug.LogWarning("Register cancelled.");
+                        SetStatus("Registration cancelled.");
                         return;
                     }
 
+                    // ❌ Error
                     if (task.IsFaulted)
                     {
                         string error = GetFirebaseError(task.Exception);
-                        SetStatus("❌ " + error);
+                        SetStatus(error);
                         Debug.LogError("Register failed: " + error);
-                        return; // Stay on screen
+                        return;
                     }
 
-                    // Success — load game
-                    Debug.Log("✅ Account created: " + task.Result.User.Email);
-                    SetStatus("✅ Account created! Loading game...");
-                    LoadGameScene();
+                    // ✅ SUCCESS
+                    FirebaseUser user = task.Result.User;
+                    Debug.Log("Account created: " + user.Email);
+
+                    // 🔥 SAVE USERNAME (IMPORTANT FIX)
+                    if (!string.IsNullOrEmpty(username))
+                    {
+                        UserProfile profile = new UserProfile
+                        {
+                            DisplayName = username
+                        };
+
+                        user.UpdateUserProfileAsync(profile).ContinueWith(profileTask =>
+                        {
+                            if (profileTask.IsCompleted)
+                            {
+                                Debug.Log("Username saved: " + username);
+                            }
+                            else
+                            {
+                                Debug.LogWarning("Failed to save username.");
+                            }
+                        });
+                    }
+
+                    // ✅ Clear inputs
+                    emailInput.text = "";
+                    passwordInput.text = "";
+                    confirmPasswordInput.text = "";
+                    if (usernameInput != null)
+                        usernameInput.text = "";
+
+                    // ✅ Switch to login panel
+                    SetLoginMode();
+
+                    // ✅ Final message
+                    SetStatus("Registration complete. Please login.");
                 });
             });
     }
@@ -190,25 +256,58 @@ public class FirebaseAuthManager : MonoBehaviour
                     ShowLoading(false);
                     SetConfirmButtonInteractable(true);
 
+                    // ❌ Cancelled
                     if (task.IsCanceled)
                     {
-                        SetStatus("❌ Login cancelled.");
-                        Debug.LogWarning("Login cancelled.");
+                        SetStatus("Login cancelled.");
                         return;
                     }
 
+                    // ❌ Error handling (FIXED PROPERLY)
                     if (task.IsFaulted)
                     {
                         string error = GetFirebaseError(task.Exception);
-                        SetStatus("❌ " + error);
+
+                        switch (error)
+                        {
+                            case "No account found. Please register first.":
+                                SetStatus("Account not found. Please register first.");
+                                break;
+
+                            case "Incorrect password.":
+                                SetStatus("Wrong password. Try again.");
+                                break;
+
+                            case "Invalid email address.":
+                                SetStatus("Invalid email format.");
+                                break;
+
+                            case "Network error. Check your connection.":
+                                SetStatus("Network issue. Try again.");
+                                break;
+
+                            default:
+                                SetStatus(error);
+                                break;
+                        }
+
                         Debug.LogError("Login failed: " + error);
-                        return; // Stay on screen
+                        return;
                     }
 
-                    // Success — load game
-                    Debug.Log("✅ Logged in: " + task.Result.User.Email);
-                    SetStatus("✅ Welcome! Loading game...");
-                    LoadGameScene();
+                    // ✅ SUCCESS
+                    Debug.Log("Logged in: " + task.Result.User.Email);
+
+                    SetStatus("Login successful!");
+                    ShowHomepage(true);
+
+                    // Clean inputs (important)
+                    emailInput.text = "";
+                    passwordInput.text = "";
+                    if (confirmPasswordInput != null)
+                        confirmPasswordInput.text = "";
+                    if (usernameInput != null)
+                        usernameInput.text = "";
                 });
             });
     }
@@ -216,26 +315,29 @@ public class FirebaseAuthManager : MonoBehaviour
     // ── SWITCH LOGIN / REGISTER MODE ───────────────────────────────
     public void OnSwitchModeButton()
     {
-        // Don't allow switching while a request is in-flight
         if (isProcessing)
         {
-            SetStatus("⏳ Please wait before switching modes.");
+            SetStatus("Please wait before switching.");
             return;
         }
 
-        // Toggle mode
         if (isLoginMode)
             SetRegisterMode();
         else
             SetLoginMode();
 
-        // Always clear fields and status when switching
+        // Clear ALL fields properly
         emailInput.text = "";
         passwordInput.text = "";
+        confirmPasswordInput.text = "";
+
+        if (usernameInput != null)
+            usernameInput.text = "";
+
         SetStatus("");
     }
 
-    void SetLoginMode()
+    /*void SetLoginMode()
     {
         isLoginMode = true;
         if (titleText) titleText.text = "Log in to your account";
@@ -251,6 +353,37 @@ public class FirebaseAuthManager : MonoBehaviour
         if (switchText) switchText.text = "Already have an account?";
         if (switchLinkText) switchLinkText.text = "Login";
         Debug.Log("Mode: REGISTER");
+    }*/
+
+
+    void SetLoginMode()
+    {
+        isLoginMode = true;
+
+        if (titleText) titleText.text = "Log in to your account";
+        if (switchText) switchText.text = "Don't have an account?";
+        if (switchLinkText) switchLinkText.text = "Register";
+
+        // Hide register fields
+        if (usernameInput) usernameInput.gameObject.SetActive(false);
+        if (confirmPasswordInput) confirmPasswordInput.gameObject.SetActive(false);
+
+        Debug.Log("Mode: LOGIN");
+    }
+
+    void SetRegisterMode()
+    {
+        isLoginMode = false;
+
+        if (titleText) titleText.text = "Create your account";
+        if (switchText) switchText.text = "Already have an account?";
+        if (switchLinkText) switchLinkText.text = "Login";
+
+        // Show register fields
+        if (usernameInput) usernameInput.gameObject.SetActive(true);
+        if (confirmPasswordInput) confirmPasswordInput.gameObject.SetActive(true);
+
+        Debug.Log("Mode: REGISTER");
     }
 
     // ── LOGOUT ─────────────────────────────────────────────────────
@@ -258,22 +391,19 @@ public class FirebaseAuthManager : MonoBehaviour
     {
         auth?.SignOut();
         Debug.Log("User signed out.");
-        SceneManager.LoadScene("LoginScene");
+        emailInput.text = "";
+        passwordInput.text = "";
+        SetLoginMode();
+        SetStatus("You have been logged out.");
+        ShowHomepage(false);
     }
 
-    // ── LOAD GAME ──────────────────────────────────────────────────
-    void LoadGameScene()
+    // ── PANEL SWITCHER ─────────────────────────────────────────────
+    void ShowHomepage(bool show)
     {
-        // Final safety check before loading
-        if (auth.CurrentUser == null)
-        {
-            SetStatus("❌ Not authenticated. Please login.");
-            Debug.LogError("Tried to load game without auth!");
-            return;
-        }
-
-        Debug.Log("✅ Loading GameScene for: " + auth.CurrentUser.Email);
-        SceneManager.LoadScene("GameScene");
+        if (loginPanel != null) loginPanel.SetActive(!show);
+        if (homepagePanel != null) homepagePanel.SetActive(show);
+        Debug.Log(show ? "Homepage shown" : "LoginPanel shown");
     }
 
     // ── UI HELPERS ─────────────────────────────────────────────────
@@ -323,4 +453,8 @@ public class FirebaseAuthManager : MonoBehaviour
 
         return exception.Message;
     }
+
+
+
+
 }
