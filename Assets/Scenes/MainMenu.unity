@@ -8245,17 +8245,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   loginPanel: {fileID: 0}
+  registerPanel: {fileID: 0}
   homepagePanel: {fileID: 0}
-  emailInput: {fileID: 1187934917}
-  passwordInput: {fileID: 2104381501}
-  statusText: {fileID: 0}
-  titleText: {fileID: 0}
-  switchText: {fileID: 0}
-  switchLinkText: {fileID: 0}
-  confirmButton: {fileID: 1093752756}
+  login_Email: {fileID: 0}
+  login_Password: {fileID: 0}
+  login_Status: {fileID: 0}
+  login_ConfirmButton: {fileID: 0}
+  login_SwitchButton: {fileID: 0}
+  reg_Username: {fileID: 0}
+  reg_Email: {fileID: 0}
+  reg_Phone: {fileID: 0}
+  reg_Password: {fileID: 0}
+  reg_ConfirmPassword: {fileID: 0}
+  reg_Status: {fileID: 0}
+  reg_ConfirmButton: {fileID: 0}
+  reg_SwitchButton: {fileID: 0}
   loadingPanel: {fileID: 0}
-  usernameInput: {fileID: 0}
-  confirmPasswordInput: {fileID: 0}
 --- !u!1 &372575073
 GameObject:
   m_ObjectHideFlags: 0
@@ -26874,7 +26879,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1944766872}
         m_TargetAssemblyTypeName: FirebaseAuthManager, Assembly-CSharp
-        m_MethodName: OnConfirmButton
+        m_MethodName: OnLoginConfirmButton
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -27953,7 +27958,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1944766872}
         m_TargetAssemblyTypeName: FirebaseAuthManager, Assembly-CSharp
-        m_MethodName: OnSwitchModeButton
+        m_MethodName: OnRegisterConfirmButton
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -34344,30 +34349,6 @@ MonoBehaviour:
         m_TargetAssemblyTypeName: UnityEngine.GameObject, UnityEngine
         m_MethodName: SetActive
         m_Mode: 6
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
-      - m_Target: {fileID: 1944766872}
-        m_TargetAssemblyTypeName: FirebaseAuthManager, Assembly-CSharp
-        m_MethodName: Register
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
-      - m_Target: {fileID: 1944766872}
-        m_TargetAssemblyTypeName: FirebaseAuthManager, Assembly-CSharp
-        m_MethodName: OnSwitchModeButton
-        m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
@@ -49150,17 +49131,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   loginPanel: {fileID: 371658006}
+  registerPanel: {fileID: 804843809}
   homepagePanel: {fileID: 5776353813036075325}
-  emailInput: {fileID: 1187934917}
-  passwordInput: {fileID: 2104381501}
-  statusText: {fileID: 1830489076}
-  titleText: {fileID: 0}
-  switchText: {fileID: 0}
-  switchLinkText: {fileID: 0}
-  confirmButton: {fileID: 1093752756}
+  login_Email: {fileID: 1187934917}
+  login_Password: {fileID: 2104381501}
+  login_Status: {fileID: 1830489076}
+  login_ConfirmButton: {fileID: 0}
+  login_SwitchButton: {fileID: 0}
+  reg_Username: {fileID: 1846817551}
+  reg_Email: {fileID: 455809060}
+  reg_Phone: {fileID: 120107377}
+  reg_Password: {fileID: 1422023765}
+  reg_ConfirmPassword: {fileID: 432672482}
+  reg_Status: {fileID: 556320964}
+  reg_ConfirmButton: {fileID: 0}
+  reg_SwitchButton: {fileID: 0}
   loadingPanel: {fileID: 0}
-  usernameInput: {fileID: 1846817551}
-  confirmPasswordInput: {fileID: 432672482}
 --- !u!114 &1944766873
 MonoBehaviour:
   m_ObjectHideFlags: 0

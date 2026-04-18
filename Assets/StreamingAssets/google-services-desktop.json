@@ -1,40 +1,21 @@
 {
   "project_info": {
-    "project_number": "372860127053",
-    "project_id": "ar-viso-game",
-    "storage_bucket": "ar-viso-game.firebasestorage.app"
+    "project_number": "80300110079",
+    "project_id": "mobile-app-d7ae4",
+    "storage_bucket": "mobile-app-d7ae4.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:372860127053:android:bfe2e5152e41ef68595904",
+        "mobilesdk_app_id": "1:80300110079:android:95bfb53786c1c412ff9cca",
         "android_client_info": {
-          "package_name": "com.rulpi.ar"
+          "package_name": "com.amr.viso"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBv6Y8sG4tA8PwlVytXLw9EPo11Qu6FDrk"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:372860127053:android:ad43a9082d40e4b8595904",
-        "android_client_info": {
-          "package_name": "com.rulpi.argame"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyBv6Y8sG4tA8PwlVytXLw9EPo11Qu6FDrk"
+          "current_key": "AIzaSyBGJDekXO6ombt--bS9LUbhY2yKj4DVSgU"
         }
       ],
       "services": {

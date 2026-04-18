@@ -11,39 +11,47 @@ public class FirebaseAuthManager : MonoBehaviour
     private bool firebaseReady = false;
     private bool isLoginMode = true;
     private bool isProcessing = false;
-   // private bool hasRegistered = false;
 
-    [Header("Panels")]
-    public GameObject loginPanel;       // drag your LoginPanel here
-    public GameObject homepagePanel;    // drag your Homepage panel here
+    [Header("── PANELS ──")]
+    public GameObject loginPanel;
+    public GameObject registerPanel;
+    public GameObject homepagePanel;
 
-    [Header("UI References")]
-    public TMP_InputField emailInput;
-    public TMP_InputField passwordInput;
-    public TMP_Text statusText;
-    public TMP_Text titleText;
-    public TMP_Text switchText;
-    public TMP_Text switchLinkText;
-    public Button confirmButton;
+    [Header("── LOGIN PANEL FIELDS ──")]
+    public TMP_InputField login_Email;
+    public TMP_InputField login_Password;
+    public TMP_Text login_Status;
+    public Button login_ConfirmButton;
+    public Button login_SwitchButton;     // "Register" link
+
+    [Header("── REGISTER PANEL FIELDS ──")]
+    public TMP_InputField reg_Username;
+    public TMP_InputField reg_Email;
+    public TMP_InputField reg_Phone;
+    public TMP_InputField reg_Password;
+    public TMP_InputField reg_ConfirmPassword;
+    public TMP_Text reg_Status;
+    public Button reg_ConfirmButton;
+    public Button reg_SwitchButton;       // "Login" link
+
+    [Header("── SHARED ──")]
     public GameObject loadingPanel;
 
-
-    public TMP_InputField usernameInput;
-    public TMP_InputField confirmPasswordInput;
-
-
-    // ── UNITY START ────────────────────────────────────────────────
+    // ── START ──────────────────────────────────────────────────────
     void Start()
     {
-        Debug.Log("=== SCRIPT IS RUNNING ===");
+        Debug.Log("=== FirebaseAuthManager START | Instance: "
+                  + this.GetInstanceID()
+                  + " | GameObject: " + this.gameObject.name);
 
-        // Make sure homepage is hidden at start
-        ShowHomepage(false);
+        // Show login panel only
+        ShowPanel("login");
 
-        // Block confirm button until Firebase is ready
-        SetConfirmButtonInteractable(false);
-        SetStatus("Initializing Firebase...");
-        Debug.Log("=== Firebase Init Starting ===");
+        // Disable confirm buttons until Firebase is ready
+        SetLoginConfirmInteractable(false);
+        SetRegisterConfirmInteractable(false);
+
+        SetLoginStatus("Initializing...");
 
         FirebaseApp.CheckAndFixDependenciesAsync().ContinueWith(task =>
         {
@@ -53,376 +61,295 @@ public class FirebaseAuthManager : MonoBehaviour
                 {
                     auth = FirebaseAuth.DefaultInstance;
                     firebaseReady = true;
-                    Debug.Log("Firebase Ready!");
+                    Debug.Log("✅ Firebase Ready!");
 
-                    // If already logged in from a previous session -> go straight to homepage
-                   /* if (auth.CurrentUser != null)
-                    {
-                        Debug.Log("Already logged in: " + auth.CurrentUser.Email);
-                        ShowHomepage(true);
-                    }*/
-                   // else
-                    
-                        SetConfirmButtonInteractable(true);
-                        SetLoginMode();
-                        SetStatus("Please login or register.");
-                    
+                    SetLoginConfirmInteractable(true);
+                    SetRegisterConfirmInteractable(true);
+                    SetLoginStatus("Please login or register.");
                 }
                 else
                 {
-                    SetStatus("Firebase failed to load.");
+                    SetLoginStatus("Firebase failed to load.");
                     Debug.LogError("Firebase FAILED: " + task.Result);
                 }
             });
         });
     }
 
-    // ── CONFIRM BUTTON ─────────────────────────────────────────────
-    public void OnConfirmButton()
+    // ── LOGIN CONFIRM ──────────────────────────────────────────────
+    public void OnLoginConfirmButton()
     {
-        if (isProcessing)
-        {
-            SetStatus("Please wait...");
-            return;
-        }
+        if (isProcessing) { SetLoginStatus("Please wait..."); return; }
+        if (!firebaseReady) { SetLoginStatus("Not ready, wait..."); return; }
 
-        if (!firebaseReady)
-        {
-            SetStatus("Firebase not ready. Please wait.");
-            return;
-        }
+        string email = login_Email != null ? login_Email.text.Trim() : "";
+        string password = login_Password != null ? login_Password.text : "";
 
-        string email = emailInput.text.Trim();
-        string password = passwordInput.text;
-        string username = usernameInput != null ? usernameInput.text.Trim() : "";
-        string confirmPassword = confirmPasswordInput != null ? confirmPasswordInput.text : "";
-
-        // ── EMAIL VALIDATION ─────────────────────
         if (string.IsNullOrEmpty(email))
         {
-            SetStatus("Please enter your email.");
+            SetLoginStatus("Please enter your email.");
             return;
         }
-
         if (!IsValidEmail(email))
         {
-            SetStatus("Please enter a valid email address.");
+            SetLoginStatus("Please enter a valid email.");
             return;
         }
-
-        // ── PASSWORD VALIDATION ──────────────────
         if (string.IsNullOrEmpty(password))
         {
-            SetStatus("Please enter your password.");
+            SetLoginStatus("Please enter your password.");
             return;
         }
-
         if (password.Length < 6)
         {
-            SetStatus("Password must be at least 6 characters.");
+            SetLoginStatus("Password must be at least 6 characters.");
             return;
         }
 
-        // ── REGISTER MODE VALIDATION ─────────────
-        if (!isLoginMode)
-        {
-            if (string.IsNullOrEmpty(username))
-            {
-                SetStatus("Please enter a username.");
-                return;
-            }
-
-            if (string.IsNullOrEmpty(confirmPassword))
-            {
-                SetStatus("Please confirm your password.");
-                return;
-            }
-
-            if (password != confirmPassword)
-            {
-                SetStatus("Passwords do not match.");
-                return;
-            }
-
-            // ✅ REGISTER
-            Register(email, password);
-        }
-        else
-        {
-            // ✅ LOGIN
-            Login(email, password);
-        }
+        Login(email, password);
     }
 
-    // ── EMAIL VALIDATION ───────────────────────────────────────────
-    bool IsValidEmail(string email)
+    // ── REGISTER CONFIRM ───────────────────────────────────────────
+    public void OnRegisterConfirmButton()
     {
-        string pattern = @"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$";
-        return Regex.IsMatch(email, pattern, RegexOptions.IgnoreCase);
+        if (isProcessing) { SetRegisterStatus("Please wait..."); return; }
+        if (!firebaseReady) { SetRegisterStatus("Not ready, wait..."); return; }
+
+        string username = reg_Username != null ? reg_Username.text.Trim() : "";
+        string email = reg_Email != null ? reg_Email.text.Trim() : "";
+        string phone = reg_Phone != null ? reg_Phone.text.Trim() : "";
+        string password = reg_Password != null ? reg_Password.text : "";
+        string confirmPassword = reg_ConfirmPassword != null ? reg_ConfirmPassword.text : "";
+
+        if (string.IsNullOrEmpty(username))
+        {
+            SetRegisterStatus("Please enter a username.");
+            return;
+        }
+        if (string.IsNullOrEmpty(email))
+        {
+            SetRegisterStatus("Please enter your email.");
+            return;
+        }
+        if (!IsValidEmail(email))
+        {
+            SetRegisterStatus("Please enter a valid email.");
+            return;
+        }
+        if (string.IsNullOrEmpty(phone))
+        {
+            SetRegisterStatus("Please enter your phone number.");
+            return;
+        }
+        if (!IsValidPhone(phone))
+        {
+            SetRegisterStatus("Please enter a valid phone number.");
+            return;
+        }
+        if (string.IsNullOrEmpty(password))
+        {
+            SetRegisterStatus("Please enter a password.");
+            return;
+        }
+        if (password.Length < 6)
+        {
+            SetRegisterStatus("Password must be at least 6 characters.");
+            return;
+        }
+        if (string.IsNullOrEmpty(confirmPassword))
+        {
+            SetRegisterStatus("Please confirm your password.");
+            return;
+        }
+        if (password != confirmPassword)
+        {
+            SetRegisterStatus("Passwords do not match.");
+            return;
+        }
+
+        Register(email, password, username, phone);
     }
 
-    // ── REGISTER ───────────────────────────────────────────────────
-    void Register(string email, string password)
+    // ── SWITCH TO REGISTER ─────────────────────────────────────────
+    public void OnGoToRegister()
     {
-        isProcessing = true;
-        SetConfirmButtonInteractable(false);
-        ShowLoading(true);
-        SetStatus("Creating account...");
-        Debug.Log("Attempting Register: " + email);
-
-        string username = usernameInput != null ? usernameInput.text.Trim() : "";
-
-        auth.CreateUserWithEmailAndPasswordAsync(email, password)
-            .ContinueWith(task =>
-            {
-                UnityMainThreadDispatcher.Instance().Enqueue(() =>
-                {
-                    isProcessing = false;
-                    ShowLoading(false);
-                    SetConfirmButtonInteractable(true);
-
-                    // ❌ Cancelled
-                    if (task.IsCanceled)
-                    {
-                        SetStatus("Registration cancelled.");
-                        return;
-                    }
-
-                    // ❌ Error
-                    if (task.IsFaulted)
-                    {
-                        string error = GetFirebaseError(task.Exception);
-                        SetStatus(error);
-                        Debug.LogError("Register failed: " + error);
-                        return;
-                    }
-
-                    // ✅ SUCCESS
-                    FirebaseUser user = task.Result.User;
-                    Debug.Log("Account created: " + user.Email);
-
-                    // 🔥 SAVE USERNAME (IMPORTANT FIX)
-                    if (!string.IsNullOrEmpty(username))
-                    {
-                        UserProfile profile = new UserProfile
-                        {
-                            DisplayName = username
-                        };
-
-                        user.UpdateUserProfileAsync(profile).ContinueWith(profileTask =>
-                        {
-                            if (profileTask.IsCompleted)
-                            {
-                                Debug.Log("Username saved: " + username);
-                            }
-                            else
-                            {
-                                Debug.LogWarning("Failed to save username.");
-                            }
-                        });
-                    }
-
-                    // ✅ Clear inputs
-                    emailInput.text = "";
-                    passwordInput.text = "";
-                    confirmPasswordInput.text = "";
-                    if (usernameInput != null)
-                        usernameInput.text = "";
-
-                    // ✅ Switch to login panel
-                    SetLoginMode();
-
-                    // ✅ Final message
-                    SetStatus("Registration complete. Please login.");
-                });
-            });
+        if (isProcessing) { isProcessing = false; ShowLoading(false); }
+        ClearLoginFields();
+        SetLoginStatus("");
+        ShowPanel("register");
+        Debug.Log("Switched to REGISTER panel");
     }
 
-    // ── LOGIN ──────────────────────────────────────────────────────
+    // ── SWITCH TO LOGIN ────────────────────────────────────────────
+    public void OnGoToLogin()
+    {
+        if (isProcessing) { isProcessing = false; ShowLoading(false); }
+        ClearRegisterFields();
+        SetRegisterStatus("");
+        ShowPanel("login");
+        Debug.Log("Switched to LOGIN panel");
+    }
+
+    // ── LOGIN LOGIC ────────────────────────────────────────────────
     void Login(string email, string password)
     {
         isProcessing = true;
-        SetConfirmButtonInteractable(false);
+        SetLoginConfirmInteractable(false);
         ShowLoading(true);
-        SetStatus("Logging in...");
-        Debug.Log("Attempting Login: " + email);
+        SetLoginStatus("Logging in...");
 
-        auth.SignInWithEmailAndPasswordAsync(email, password)
-            .ContinueWith(task =>
-            {
-                UnityMainThreadDispatcher.Instance().Enqueue(() =>
-                {
-                    isProcessing = false;
-                    ShowLoading(false);
-                    SetConfirmButtonInteractable(true);
-
-                    // ❌ Cancelled
-                    if (task.IsCanceled)
-                    {
-                        SetStatus("Login cancelled.");
-                        return;
-                    }
-
-                    // ❌ Error handling (FIXED PROPERLY)
-                    if (task.IsFaulted)
-                    {
-                        string error = GetFirebaseError(task.Exception);
-
-                        switch (error)
-                        {
-                            case "No account found. Please register first.":
-                                SetStatus("Account not found. Please register first.");
-                                break;
-
-                            case "Incorrect password.":
-                                SetStatus("Wrong password. Try again.");
-                                break;
-
-                            case "Invalid email address.":
-                                SetStatus("Invalid email format.");
-                                break;
-
-                            case "Network error. Check your connection.":
-                                SetStatus("Network issue. Try again.");
-                                break;
-
-                            default:
-                                SetStatus(error);
-                                break;
-                        }
-
-                        Debug.LogError("Login failed: " + error);
-                        return;
-                    }
-
-                    // ✅ SUCCESS
-                    Debug.Log("Logged in: " + task.Result.User.Email);
-
-                    SetStatus("Login successful!");
-                    ShowHomepage(true);
-
-                    // Clean inputs (important)
-                    emailInput.text = "";
-                    passwordInput.text = "";
-                    if (confirmPasswordInput != null)
-                        confirmPasswordInput.text = "";
-                    if (usernameInput != null)
-                        usernameInput.text = "";
-                });
-            });
-    }
-
-    // ── SWITCH LOGIN / REGISTER MODE ───────────────────────────────
-    public void OnSwitchModeButton()
-    {
-        if (isProcessing)
+        auth.SignInWithEmailAndPasswordAsync(email, password).ContinueWith(task =>
         {
-            SetStatus("Please wait before switching.");
-            return;
-        }
+            UnityMainThreadDispatcher.Instance().Enqueue(() =>
+            {
+                isProcessing = false;
+                ShowLoading(false);
+                SetLoginConfirmInteractable(true);
 
-        if (isLoginMode)
-            SetRegisterMode();
-        else
-            SetLoginMode();
+                if (task.IsCanceled)
+                {
+                    SetLoginStatus("Login cancelled.");
+                    return;
+                }
 
-        // Clear ALL fields properly
-        emailInput.text = "";
-        passwordInput.text = "";
-        confirmPasswordInput.text = "";
+                if (task.IsFaulted)
+                {
+                    string error = GetFirebaseError(task.Exception);
+                    SetLoginStatus(error);
+                    // ✅ User can now freely click "Register" to switch panel
+                    return;
+                }
 
-        if (usernameInput != null)
-            usernameInput.text = "";
-
-        SetStatus("");
+                Debug.Log("✅ Logged in: " + task.Result.User.Email);
+                SetLoginStatus("Login successful!");
+                ClearLoginFields();
+                ShowPanel("homepage");
+            });
+        });
     }
 
-    /*void SetLoginMode()
+    // ── REGISTER LOGIC ─────────────────────────────────────────────
+    void Register(string email, string password, string username, string phone)
     {
-        isLoginMode = true;
-        if (titleText) titleText.text = "Log in to your account";
-        if (switchText) switchText.text = "Don't have an account?";
-        if (switchLinkText) switchLinkText.text = "Register";
-        Debug.Log("Mode: LOGIN");
-    }
+        isProcessing = true;
+        SetRegisterConfirmInteractable(false);
+        ShowLoading(true);
+        SetRegisterStatus("Creating account...");
 
-    void SetRegisterMode()
-    {
-        isLoginMode = false;
-        if (titleText) titleText.text = "Create your account";
-        if (switchText) switchText.text = "Already have an account?";
-        if (switchLinkText) switchLinkText.text = "Login";
-        Debug.Log("Mode: REGISTER");
-    }*/
+        auth.CreateUserWithEmailAndPasswordAsync(email, password).ContinueWith(task =>
+        {
+            UnityMainThreadDispatcher.Instance().Enqueue(() =>
+            {
+                isProcessing = false;
+                ShowLoading(false);
+                SetRegisterConfirmInteractable(true);
 
+                if (task.IsCanceled)
+                {
+                    SetRegisterStatus("Registration cancelled.");
+                    return;
+                }
 
-    void SetLoginMode()
-    {
-        isLoginMode = true;
+                if (task.IsFaulted)
+                {
+                    string error = GetFirebaseError(task.Exception);
+                    SetRegisterStatus(error);
+                    return;
+                }
 
-        if (titleText) titleText.text = "Log in to your account";
-        if (switchText) switchText.text = "Don't have an account?";
-        if (switchLinkText) switchLinkText.text = "Register";
+                // ✅ Save display name
+                FirebaseUser user = task.Result.User;
+                UserProfile profile = new UserProfile { DisplayName = username };
+                user.UpdateUserProfileAsync(profile).ContinueWith(profileTask =>
+                {
+                    Debug.Log(profileTask.IsCompleted
+                        ? "✅ Username saved: " + username
+                        : "⚠️ Failed to save username.");
+                });
 
-        // Hide register fields
-        if (usernameInput) usernameInput.gameObject.SetActive(false);
-        if (confirmPasswordInput) confirmPasswordInput.gameObject.SetActive(false);
-
-        Debug.Log("Mode: LOGIN");
-    }
-
-    void SetRegisterMode()
-    {
-        isLoginMode = false;
-
-        if (titleText) titleText.text = "Create your account";
-        if (switchText) switchText.text = "Already have an account?";
-        if (switchLinkText) switchLinkText.text = "Login";
-
-        // Show register fields
-        if (usernameInput) usernameInput.gameObject.SetActive(true);
-        if (confirmPasswordInput) confirmPasswordInput.gameObject.SetActive(true);
-
-        Debug.Log("Mode: REGISTER");
+                ClearRegisterFields();
+                SetRegisterStatus("");
+                ShowPanel("login");
+                SetLoginStatus("✅ Registered! Please login.");
+            });
+        });
     }
 
     // ── LOGOUT ─────────────────────────────────────────────────────
     public void Logout()
     {
         auth?.SignOut();
-        Debug.Log("User signed out.");
-        emailInput.text = "";
-        passwordInput.text = "";
-        SetLoginMode();
-        SetStatus("You have been logged out.");
-        ShowHomepage(false);
+        ClearLoginFields();
+        ClearRegisterFields();
+        SetLoginStatus("You have been logged out.");
+        ShowPanel("login");
+        Debug.Log("User logged out.");
     }
 
     // ── PANEL SWITCHER ─────────────────────────────────────────────
-    void ShowHomepage(bool show)
+    void ShowPanel(string panel)
     {
-        if (loginPanel != null) loginPanel.SetActive(!show);
-        if (homepagePanel != null) homepagePanel.SetActive(show);
-        Debug.Log(show ? "Homepage shown" : "LoginPanel shown");
+        if (loginPanel) loginPanel.SetActive(panel == "login");
+        if (registerPanel) registerPanel.SetActive(panel == "register");
+        if (homepagePanel) homepagePanel.SetActive(panel == "homepage");
+        Debug.Log("Active panel: " + panel);
     }
 
-    // ── UI HELPERS ─────────────────────────────────────────────────
-    void SetConfirmButtonInteractable(bool interactable)
+    // ── CLEAR FIELDS ───────────────────────────────────────────────
+    void ClearLoginFields()
     {
-        if (confirmButton != null)
-            confirmButton.interactable = interactable;
+        if (login_Email) login_Email.text = "";
+        if (login_Password) login_Password.text = "";
     }
 
-    void SetStatus(string message)
+    void ClearRegisterFields()
     {
-        if (statusText != null)
-            statusText.text = message;
+        if (reg_Username) reg_Username.text = "";
+        if (reg_Email) reg_Email.text = "";
+        if (reg_Phone) reg_Phone.text = "";
+        if (reg_Password) reg_Password.text = "";
+        if (reg_ConfirmPassword) reg_ConfirmPassword.text = "";
     }
 
+    // ── STATUS TEXT ────────────────────────────────────────────────
+    void SetLoginStatus(string msg)
+    {
+        if (login_Status != null) login_Status.text = msg;
+    }
+
+    void SetRegisterStatus(string msg)
+    {
+        if (reg_Status != null) reg_Status.text = msg;
+    }
+
+    // ── BUTTON INTERACTABLE ────────────────────────────────────────
+    void SetLoginConfirmInteractable(bool v)
+    {
+        if (login_ConfirmButton != null) login_ConfirmButton.interactable = v;
+    }
+
+    void SetRegisterConfirmInteractable(bool v)
+    {
+        if (reg_ConfirmButton != null) reg_ConfirmButton.interactable = v;
+    }
+
+    // ── LOADING ────────────────────────────────────────────────────
     void ShowLoading(bool show)
     {
-        if (loadingPanel != null)
-            loadingPanel.SetActive(show);
+        if (loadingPanel != null) loadingPanel.SetActive(show);
+    }
+
+    // ── VALIDATION ─────────────────────────────────────────────────
+    bool IsValidEmail(string email)
+    {
+        return Regex.IsMatch(email,
+            @"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$",
+            RegexOptions.IgnoreCase);
+    }
+
+    bool IsValidPhone(string phone)
+    {
+        return Regex.IsMatch(phone, @"^\+?[0-9]{7,15}$");
     }
 
     // ── FIREBASE ERROR HANDLER ─────────────────────────────────────
@@ -440,21 +367,17 @@ public class FirebaseAuthManager : MonoBehaviour
             var errorCode = (AuthError)firebaseEx.ErrorCode;
             return errorCode switch
             {
-                AuthError.EmailAlreadyInUse => "Email already in use. Try logging in instead.",
+                AuthError.EmailAlreadyInUse => "Email already in use. Try logging in.",
                 AuthError.InvalidEmail => "Invalid email address.",
                 AuthError.WeakPassword => "Password is too weak.",
-                AuthError.WrongPassword => "Incorrect password.",
-                AuthError.UserNotFound => "No account found. Please register first.",
-                AuthError.NetworkRequestFailed => "Network error. Check your connection.",
-                AuthError.TooManyRequests => "Too many attempts. Please try later.",
+                AuthError.WrongPassword => "Wrong password. Try again.",
+                AuthError.UserNotFound => "No account found. Please register.",
+                AuthError.NetworkRequestFailed => "Network error. Check connection.",
+                AuthError.TooManyRequests => "Too many attempts. Try later.",
                 _ => firebaseEx.Message
             };
         }
 
         return exception.Message;
     }
-
-
-
-
 }
