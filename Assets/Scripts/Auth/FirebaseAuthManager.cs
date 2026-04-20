@@ -1,20 +1,23 @@
-using UnityEngine;
 using Firebase;
 using Firebase.Auth;
 using Firebase.Firestore;
-using TMPro;
-using UnityEngine.UI;
-using System.Text.RegularExpressions;
-using System.Collections.Generic;
-
 using Firebase.Storage;
-using System.IO;
-using UnityEngine.Networking;
+using Mapbox.Examples.Voxels;
 using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.RegularExpressions;
+using TMPro;
+using UnityEngine;
+using UnityEngine.Networking;
+using UnityEngine.UI;
+
 public class FirebaseAuthManager : MonoBehaviour
 {
     private FirebaseAuth auth;
     private FirebaseFirestore db;
+    private FirebaseStorage storage;
+    private StorageReference storageRef;
     private bool firebaseReady = false;
     private bool isProcessing = false;
 
@@ -38,21 +41,26 @@ public class FirebaseAuthManager : MonoBehaviour
     public TMP_Text reg_Status;
     public Button reg_ConfirmButton;
 
-    [Header("── HOMEPAGE ──")]
-    public TMP_Text home_UsernameText;   // ← drag your username TMP text here
-    public Image home_ProfilePicture; // ← drag your profile Image here
+    [Header("── HOMEPAGE & PROFILE ──")]
+    public TMP_Text home_UsernameText;       // username text on top card
+    public TMP_Text home_TopUsername;        // big name text on top card
+    public TMP_Text profile_Username;        // username in Profile Info section
+    public TMP_Text profile_Email;           // email in Profile Info section
+    public TMP_Text profile_Phone;           // phone in Profile Info section
+    public Image home_ProfilePicture;     // circle image on top card
+    public Image profile_ProfilePicture;  // circle image in Profile Info section
+    public Button changePictureButton;     // change picture button
+
+    [Header("── ALL GAME PANEL ──")]
+    public TMP_Text allGame_UsernameText;    // drag username text from All Game panel
+    public Image allGame_ProfilePicture;  // drag profile image from All Game panel
+
+    [Header("── VISOHUNT PANEL ──")]
+    public TMP_Text visoHunt_UsernameText;   // drag username text from Visohunt panel
+    public Image visoHunt_ProfilePicture; // 
 
     [Header("── SHARED ──")]
     public GameObject loadingPanel;
-
-
-
-
-    [Header("── PROFILE INFO PANEL ──")]
-    public TMP_Text profile_Username;   // drag "My Name" text (Profile Info section)
-    public TMP_Text profile_Email;      // drag "username@email.com" text
-    public TMP_Text profile_Phone;      // drag "+990231644" text
-    public TMP_Text home_TopUsername;   // drag "My Name" text (top card section)
 
     // ── START ──────────────────────────────────────────────────────
     void Start()
@@ -69,9 +77,11 @@ public class FirebaseAuthManager : MonoBehaviour
                 if (task.Result == DependencyStatus.Available)
                 {
                     auth = FirebaseAuth.DefaultInstance;
-                    db = FirebaseFirestore.DefaultInstance; // ← Firestore init
-                    firebaseReady = true;
+                    db = FirebaseFirestore.DefaultInstance;
+                    storage = FirebaseStorage.DefaultInstance;
+                    storageRef = storage.RootReference;
 
+                    firebaseReady = true;
                     Debug.Log("✅ Firebase Ready!");
                     SetLoginConfirmInteractable(true);
                     SetRegisterConfirmInteractable(true);
@@ -127,7 +137,6 @@ public class FirebaseAuthManager : MonoBehaviour
         if (string.IsNullOrEmpty(confirmPassword)) { SetRegisterStatus("Please confirm your password."); return; }
         if (password != confirmPassword) { SetRegisterStatus("Passwords do not match."); return; }
 
-        // ✅ Check username uniqueness FIRST, then register
         CheckUsernameAndRegister(username, email, password, phone);
     }
 
@@ -139,7 +148,6 @@ public class FirebaseAuthManager : MonoBehaviour
         ShowLoading(true);
         SetRegisterStatus("Checking username...");
 
-        // Query Firestore: does this username already exist?
         db.Collection("usernames").Document(username.ToLower()).GetSnapshotAsync()
             .ContinueWith(task =>
             {
@@ -154,7 +162,6 @@ public class FirebaseAuthManager : MonoBehaviour
                         return;
                     }
 
-                    // ❌ Username already taken
                     if (task.Result.Exists)
                     {
                         isProcessing = false;
@@ -164,7 +171,6 @@ public class FirebaseAuthManager : MonoBehaviour
                         return;
                     }
 
-                    // ✅ Username is free — proceed to register
                     Register(email, password, username, phone);
                 });
             });
@@ -199,23 +205,22 @@ public class FirebaseAuthManager : MonoBehaviour
 
                 FirebaseUser user = task.Result.User;
 
-                // ── Save DisplayName ───────────────────────────────
+                // ── Save DisplayName to Firebase Auth ──────────────
                 UserProfile profile = new UserProfile { DisplayName = username };
                 user.UpdateUserProfileAsync(profile);
 
-                // ── Save to Firestore ──────────────────────────────
-                // 1. Reserve the username (for uniqueness check)
+                // ── Reserve username in Firestore ──────────────────
                 db.Collection("usernames").Document(username.ToLower()).SetAsync(
                     new Dictionary<string, object> { { "uid", user.UserId } }
                 );
 
-                // 2. Save full user data
+                // ── Save full user data to Firestore ───────────────
                 db.Collection("users").Document(user.UserId).SetAsync(
                     new Dictionary<string, object>
                     {
-                        { "username",  username        },
-                        { "email",     email           },
-                        { "phone",     phone           },
+                        { "username",  username                  },
+                        { "email",     email                     },
+                        { "phone",     phone                     },
                         { "createdAt", FieldValue.ServerTimestamp }
                     }
                 ).ContinueWith(dbTask =>
@@ -233,7 +238,7 @@ public class FirebaseAuthManager : MonoBehaviour
                             return;
                         }
 
-                        Debug.Log("✅ User registered and saved: " + username);
+                        Debug.Log("✅ Registered: " + username);
                         ClearRegisterFields();
                         ShowPanel("login");
                         SetLoginStatus("✅ Registered! Please login.");
@@ -269,8 +274,6 @@ public class FirebaseAuthManager : MonoBehaviour
 
                 FirebaseUser user = task.Result.User;
                 Debug.Log("✅ Logged in: " + user.Email);
-
-                // ── Fetch username from Firestore ──────────────────
                 LoadUserDataAndShowHomepage(user);
             });
         });
@@ -289,50 +292,40 @@ public class FirebaseAuthManager : MonoBehaviour
                 {
                     ShowLoading(false);
 
-                    // ── Always read from Firebase Auth first ───────────
-                    // DisplayName = username (saved during register)
-                    // Email       = always stored in Firebase Auth
-                    string displayUsername = user.DisplayName;  // from Firebase Auth
-                    string displayEmail = user.Email;        // from Firebase Auth
+                    string displayUsername = user.DisplayName ?? "";
+                    string displayEmail = user.Email ?? "";
                     string displayPhone = "";
 
-                    // ── Then enrich with Firestore data ────────────────
                     if (!task.IsFaulted && task.Result.Exists)
                     {
-                        // Override only if Firestore has the value
                         if (task.Result.TryGetValue("username", out string fsUsername)
                             && !string.IsNullOrEmpty(fsUsername))
                             displayUsername = fsUsername;
 
                         if (task.Result.TryGetValue("phone", out string fsPhone))
                             displayPhone = fsPhone;
-
-                        // Email always comes from Firebase Auth — more reliable
-                        // displayEmail = user.Email is already set above
                     }
 
-                    // ── If DisplayName somehow empty, use Firestore ────
+                    // Fallback if DisplayName empty
                     if (string.IsNullOrEmpty(displayUsername))
-                    {
                         if (!task.IsFaulted && task.Result.Exists)
                             task.Result.TryGetValue("username", out displayUsername);
-                    }
 
-                    // ── Update all UI ──────────────────────────────────
-                    if (home_UsernameText != null)
-                        home_UsernameText.text = displayUsername ?? "";
+                    // ── Update all UI texts ────────────────────────
+                    if (home_UsernameText != null) home_UsernameText.text = displayUsername ?? "";
+                    if (home_TopUsername != null) home_TopUsername.text = displayUsername ?? "";
+                    if (profile_Username != null) profile_Username.text = displayUsername ?? "";
+                    if (profile_Email != null) profile_Email.text = displayEmail ?? "";
+                    if (profile_Phone != null) profile_Phone.text = displayPhone ?? "";
 
-                    if (home_TopUsername != null)
-                        home_TopUsername.text = displayUsername ?? "";
+                    // ── All Game Panel ─────────────────────────────
+                    if (allGame_UsernameText != null) allGame_UsernameText.text = displayUsername ?? "";
 
-                    if (profile_Username != null)
-                        profile_Username.text = displayUsername ?? "";
+                    // ── Visohunt Panel ─────────────────────────────
+                    if (visoHunt_UsernameText != null) visoHunt_UsernameText.text = displayUsername ?? "";
 
-                    if (profile_Email != null)
-                        profile_Email.text = displayEmail ?? "";
-
-                    if (profile_Phone != null)
-                        profile_Phone.text = displayPhone ?? "";
+                    // ── Load profile picture ───────────────────────
+                    LoadSavedProfilePicture(task.Result);
 
                     ClearLoginFields();
                     ShowPanel("homepage");
@@ -347,18 +340,27 @@ public class FirebaseAuthManager : MonoBehaviour
         ClearLoginFields();
         ClearRegisterFields();
 
-        // ── Clear homepage ─────────────────────────────────────────────
         if (home_UsernameText != null) home_UsernameText.text = "";
         if (home_TopUsername != null) home_TopUsername.text = "";
-
-        // ── Clear profile info ─────────────────────────────────────────
         if (profile_Username != null) profile_Username.text = "";
         if (profile_Email != null) profile_Email.text = "";
         if (profile_Phone != null) profile_Phone.text = "";
 
+        // ── All Game Panel ─────────────────────────────────────────
+        if (allGame_UsernameText != null) allGame_UsernameText.text = "";
+        if (allGame_ProfilePicture != null) allGame_ProfilePicture.sprite = null;
+
+        // ── Visohunt Panel ─────────────────────────────────────────
+        if (visoHunt_UsernameText != null) visoHunt_UsernameText.text = "";
+        if (visoHunt_ProfilePicture != null) visoHunt_ProfilePicture.sprite = null;
+
+        if (home_ProfilePicture != null) home_ProfilePicture.sprite = null;
+        if (profile_ProfilePicture != null) profile_ProfilePicture.sprite = null;
+
         SetLoginStatus("You have been logged out.");
         ShowPanel("login");
     }
+
     // ── SWITCH PANELS ──────────────────────────────────────────────
     public void OnGoToRegister()
     {
@@ -419,7 +421,7 @@ public class FirebaseAuthManager : MonoBehaviour
         Regex.IsMatch(phone, @"^\+?[0-9]{7,15}$");
 
     bool IsValidUsername(string username) =>
-        Regex.IsMatch(username, @"^[a-zA-Z0-9_]+$"); // letters, numbers, underscore only
+        Regex.IsMatch(username, @"^[a-zA-Z0-9_]+$");
 
     // ── FIREBASE ERROR ─────────────────────────────────────────────
     string GetFirebaseError(System.AggregateException exception)
@@ -448,5 +450,156 @@ public class FirebaseAuthManager : MonoBehaviour
         }
 
         return exception.Message;
+    }
+
+    // ── CHANGE PICTURE BUTTON ──────────────────────────────────────
+    public void OnChangePictureButton()
+    {
+#if UNITY_EDITOR
+        // In Editor — use file dialog
+        string path = UnityEditor.EditorUtility.OpenFilePanel(
+            "Select Profile Picture", "", "png,jpg,jpeg");
+
+        if (!string.IsNullOrEmpty(path))
+        {
+            Debug.Log("Image selected: " + path);
+            StartCoroutine(UploadProfilePicture(path));
+        }
+
+#elif UNITY_ANDROID || UNITY_IOS
+    // On device — needs NativeGallery plugin
+    NativeGallery.GetImageFromGallery((path) =>
+    {
+        if (path == null) { Debug.Log("No image selected."); return; }
+        Debug.Log("Image selected: " + path);
+        StartCoroutine(UploadProfilePicture(path));
+    }, "Select Profile Picture", "image/*");
+
+#endif
+    }
+
+    // ── UPLOAD PROFILE PICTURE ─────────────────────────────────────
+    IEnumerator UploadProfilePicture(string imagePath)
+    {
+        ShowLoading(true);
+
+        byte[] imageBytes = File.ReadAllBytes(imagePath);
+        Texture2D tex = new Texture2D(2, 2);
+        tex.LoadImage(imageBytes);
+        TextureScale.Bilinear(tex, 256, 256);
+        byte[] resizedBytes = tex.EncodeToJPG(75);
+
+        string userId = auth.CurrentUser.UserId;
+        StorageReference pictureRef = storageRef
+            .Child("profilePictures")
+            .Child(userId)
+            .Child("profile.jpg");
+
+        var uploadTask = pictureRef.PutBytesAsync(resizedBytes);
+        yield return new WaitUntil(() => uploadTask.IsCompleted);
+
+        if (uploadTask.IsFaulted)
+        {
+            ShowLoading(false);
+            Debug.LogError("Upload failed: " + uploadTask.Exception);
+            yield break;
+        }
+
+        var urlTask = pictureRef.GetDownloadUrlAsync();
+        yield return new WaitUntil(() => urlTask.IsCompleted);
+
+        if (urlTask.IsFaulted)
+        {
+            ShowLoading(false);
+            Debug.LogError("URL fetch failed: " + urlTask.Exception);
+            yield break;
+        }
+
+        string downloadUrl = urlTask.Result.ToString();
+        Debug.Log("✅ Download URL: " + downloadUrl);
+
+        // ── Save URL to Firestore ──────────────────────────────────
+        db.Collection("users").Document(userId).UpdateAsync("profilePicUrl", downloadUrl)
+            .ContinueWith(task =>
+            {
+                UnityMainThreadDispatcher.Instance().Enqueue(() =>
+                {
+                    if (task.IsFaulted)
+                        Debug.LogError("Failed to save picture URL: " + task.Exception);
+                    else
+                        Debug.Log("✅ Picture URL saved to Firestore.");
+                });
+            });
+
+        // ── Save URL to Firebase Auth photoURL ────────────────────
+        UserProfile profile = new UserProfile
+        {
+            DisplayName = auth.CurrentUser.DisplayName,
+            PhotoUrl = new System.Uri(downloadUrl)
+        };
+        auth.CurrentUser.UpdateUserProfileAsync(profile);
+
+        // ── Show new picture immediately ───────────────────────────
+        StartCoroutine(LoadProfilePicture(downloadUrl));
+    }
+
+    // ── LOAD PICTURE FROM URL ──────────────────────────────────────
+    IEnumerator LoadProfilePicture(string url)
+    {
+        using (UnityWebRequest request = UnityWebRequestTexture.GetTexture(url))
+        {
+            yield return request.SendWebRequest();
+
+            ShowLoading(false);
+
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError("Failed to load picture: " + request.error);
+                yield break;
+            }
+
+            Texture2D texture = DownloadHandlerTexture.GetContent(request);
+            Sprite sprite = Sprite.Create(
+                texture,
+                new Rect(0, 0, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f)
+            );
+
+            if (home_ProfilePicture != null) home_ProfilePicture.sprite = sprite;
+            if (profile_ProfilePicture != null) profile_ProfilePicture.sprite = sprite;
+
+            // ── All Game Panel ─────────────────────────────────────
+            if (allGame_ProfilePicture != null) allGame_ProfilePicture.sprite = sprite;
+
+            // ── Visohunt Panel ─────────────────────────────────────
+            if (visoHunt_ProfilePicture != null) visoHunt_ProfilePicture.sprite = sprite;
+
+            Debug.Log("✅ Profile picture updated!");
+        }
+    }
+
+    // ── LOAD SAVED PICTURE ON LOGIN ────────────────────────────────
+    void LoadSavedProfilePicture(DocumentSnapshot doc)
+    {
+        // Try Firebase Auth photoURL first
+        if (auth.CurrentUser.PhotoUrl != null)
+        {
+            string photoUrl = auth.CurrentUser.PhotoUrl.ToString();
+            if (!string.IsNullOrEmpty(photoUrl))
+            {
+                StartCoroutine(LoadProfilePicture(photoUrl));
+                return;
+            }
+        }
+
+        // Fallback: Firestore URL
+        if (doc != null && doc.Exists)
+        {
+            if (doc.TryGetValue("profilePicUrl", out string savedUrl)
+                && !string.IsNullOrEmpty(savedUrl))
+            {
+                StartCoroutine(LoadProfilePicture(savedUrl));
+            }
+        }
     }
 }
