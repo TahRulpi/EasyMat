@@ -221,6 +221,7 @@ public class FirebaseAuthManager : MonoBehaviour
                         { "username",  username                  },
                         { "email",     email                     },
                         { "phone",     phone                     },
+                        { "xp",        0                          },
                         { "createdAt", FieldValue.ServerTimestamp }
                     }
                 ).ContinueWith(dbTask =>
